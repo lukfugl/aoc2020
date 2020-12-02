@@ -1,21 +1,19 @@
 module Password (checkSledPassword, checkTobogganPassword, Entry(..)) where
 
-import Data.Char (isDigit)
+import Text.ParserCombinators.ReadP
+import Text.Read.Lex
 
 data Entry = Entry Char Int Int String
-    deriving (Show)
 
 instance Read Entry where
-    readsPrec _ input =
-        let (a',rest1) = span isDigit input
-            a = read a' :: Int
-            (_:rest2) = rest1 -- dash
-            (b',rest3) = span isDigit rest2
-            b = read b' :: Int
-            (_:rest4) = rest3 -- space
-            (c:rest5) = rest4
-            (_:_:s) = rest5 -- ": <string>"
-        in [(Entry c a b s, "")]
+    readsPrec _ = readP_to_S $ do
+            a <- readDecP
+            b <- skip "-" >> readDecP
+            c <- skip " " >> lexChar
+            s <- skip ": " >> hsLex
+            return $ Entry c a b s
+        where
+            skip = traverse char
 
 checkSledPassword :: Entry -> Bool
 checkSledPassword (Entry c a b s) =
