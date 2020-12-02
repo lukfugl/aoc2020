@@ -1,10 +1,12 @@
 module Main where
 
 import Expense (findEntryPair, findEntryTriple)
-import Inputs.Day1 (input)
+import qualified Inputs.Day1 (input)
 
 main :: IO ()
 main = do
+  input <- Inputs.Day1.input
+
   -- part1
   let (a, b) = findEntryPair 2020 input
   putStrLn $ show (a * b)
