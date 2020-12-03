@@ -8,12 +8,10 @@ data Entry = Entry Char Int Int String
 instance Read Entry where
     readsPrec _ = readP_to_S $ do
             a <- readDecP
-            b <- skip "-" >> readDecP
-            c <- skip " " >> lexChar
-            s <- skip ": " >> hsLex
+            b <- char '-' >> readDecP
+            c <- skipSpaces >> lexChar
+            s <- char ':' >> skipSpaces >> hsLex
             return $ Entry c a b s
-        where
-            skip = traverse char
 
 checkSledPassword :: Entry -> Bool
 checkSledPassword (Entry c a b s) =
