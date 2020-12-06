@@ -3,17 +3,21 @@ module Main where
 import System.IO
 import Data.List
 
+-- should be able to just get form Control.Monad.Extra, but that's refusing to
+-- build on my WSL setup. counting towards lines as if imported :p
+ifM :: Monad m => m Bool -> m a -> m a -> m a
+ifM c a b = c >>= (\c' -> if c' then a else b)
+
 apply :: (String -> String -> String) -> String -> IO ()
-apply f id = openFile "days/Inputs/Day6.txt" ReadMode >>= gather 0 id
-    where gather n s handle = do
-            done <- hIsEOF handle
-            if done
-                then putStrLn $ show $ n + length s
-                else do
-                    line <- hGetLine handle
-                    if line == ""
-                        then gather (n + length s) id handle
-                        else gather n (f line s) handle
+apply f id = openFile "days/Inputs/Day6.txt" ReadMode >>= gatherRest 0 id
+    where gatherRest n s handle = do
+            ifM (hIsEOF handle)
+                (putStrLn $ show $ n + length s)
+                (hGetLine handle >>= gatherOne n s handle)
+          gatherOne n s handle line = do
+            if line == ""
+                then gatherRest (n + length s) id handle
+                else gatherRest n (f line s) handle
 
 main :: IO ()
 main = do
