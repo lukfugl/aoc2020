@@ -1,20 +1,12 @@
 module Main where
 
 import Inputs.Helpers (loadStrings)
-import Luggage (LuggageRule, asGraph, transitiveClosure)
-import Data.List
-import Text.Read (readMaybe)
-
-asVertexPair vertices n e =
-    let (i, j) = e `divMod` n
-        i' = vertices !! i
-        j' = vertices !! j
-    in show (i', j')
+import Luggage (merge, reverse, reachable, contained)
+import Prelude hiding (reverse)
 
 main :: IO ()
 main = do
-    rules <- fmap (map read) $ loadStrings "days/Inputs/Day7.txt"
-    let graph = asGraph rules
-    let (vertices, n, edges) = transitiveClosure graph
-    sequence $ map (putStrLn . asVertexPair vertices n) edges
-    return ()
+    graph <- fmap (merge . map read) $ loadStrings "days/Inputs/Day7.txt"
+    putStrLn $ show $ (length $ reachable "shiny gold" $ reverse graph) - 1
+    putStrLn $ show $ contained "shiny gold" graph
+    

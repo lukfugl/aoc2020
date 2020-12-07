@@ -1,58 +1,54 @@
-module Luggage (LuggageRule, asGraph, transitiveClosure) where
+module Luggage (DAG, merge, reverse, reachable, contained) where
 
 import Text.ParserCombinators.ReadP
 import Text.Read.Lex
-import Data.List
+import Data.List hiding (reverse)
+import Prelude hiding (reverse)
 import Data.Maybe
 
-data LuggageRule = LuggageRule String [(Int, String)]
-    deriving Show
+-- assumed acyclic based on project description
+type Edge = (String, String, Int)
+data DAG = Graph [Edge]
 
-instance Read LuggageRule where
+instance Read DAG where
     readsPrec _ = readP_to_S $ do
-        container <- many get
+        i <- many get
         string " bags contain "
-        contained <- choice
+        edges <- choice
             [ flip sepBy (string ", ") $ do
                 n <- readDecP <* skipSpaces
-                adj2 <- many $ satisfy (/= ',')
+                j <- many $ satisfy (/= ',')
                 choice [string " bags", string " bag"]
-                return (n, adj2)
+                return (i, j, n)
             , string "no other bags" >> return []
             ]
         string "."
         eof
-        return $ LuggageRule container contained
+        return $ Graph edges
 
-type Graph = ([String], Int, [Int])
+merge :: [DAG] -> DAG
+merge [] = Graph []
+merge (g:rest) = merge' g $ merge rest
+    where merge' (Graph a) (Graph b) = Graph $ a ++ b
 
-asGraph :: [LuggageRule] -> Graph
-asGraph rules =
-    let edges = concatMap asEdges rules
-        vertices = asVertices edges
-        n = length vertices
-        edges' = map (asEdge' n vertices) edges
-    in  (vertices, n, edges')
-    where
-        asEdges (LuggageRule i contained) = map (\(_, j) -> (i, j)) contained
-        asVertices [] = []
-        asVertices ((i, j):rest) =
-            let vertices = asVertices rest
-            in [i, j] `union` asVertices rest
-        asEdge' n vertices (i, j) =
-            let i' = fromJust $ i `elemIndex` vertices
-                j' = fromJust $ j `elemIndex` vertices
-            in i' * n + j'
+reverse :: DAG -> DAG
+reverse (Graph edges) = Graph $ map reverse' edges
+    where reverse' (i, j, n) = (j, i, n)
 
-transitiveClosure :: Graph -> Graph
-transitiveClosure (vertices, n, edges) = (vertices, n, foldl traverseIntermediateVertex edges [0..n-1])
-    where
-        potentialEdges = [0..n*n - 1]
-        traverseIntermediateVertex edges k = foldl (addClosingEdge k) edges potentialEdges
-        addClosingEdge k edges ij =
-            let (i, j) = ij `divMod` n
-                ik = i * n + k
-                kj = k * n + j
-            in if (ik `elem` edges) && (kj `elem` edges) && (not $ ij `elem` edges)
-                then (ij:edges)
-                else edges
+reachable :: String -> DAG -> [String]
+reachable k (Graph edges) = reachable' [] [k]
+    where reachable' acc [] = acc
+          reachable' acc (k:rest) =
+              let children = map target $ filter (shouldVisit acc k) edges
+              in reachable' (k:acc) (union rest children)
+          target (_, j, _) = j
+          hasSource k (i, _, _) = i == k
+          unvisited acc (_, j, _) = not (j `elem` acc)
+          shouldVisit acc k e = hasSource k e && unvisited acc e
+
+contained :: String -> DAG -> Int
+contained k (Graph edges) = contained' k
+    where contained' k =
+              let edges' = filter (hasSource k) edges              
+              in sum $ map (\(_, j, n) -> n * (1 + (contained' j))) edges'
+          hasSource k (i, _, _) = i == k
