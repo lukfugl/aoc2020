@@ -1,4 +1,4 @@
-module Inputs.Helpers (loadString, loadStrings, loadStringGroups) where
+module Inputs.Helpers (loadString, loadStrings, loadStringGroups, readOne, readAll) where
 
 import System.IO
 import Data.Bool
@@ -33,9 +33,15 @@ hGetStringGroup h = untilM (orM [hIsEOF h, hBlankLine h]) (hGetLine h)
 loadString :: String -> IO String
 loadString path = openFile path ReadMode >>= hGetLine
 
+readOne :: Read a => String -> IO a
+readOne = fmap read . loadString
+
 -- return all the lines of the file
 loadStrings :: String -> IO [String]
 loadStrings path = openFile path ReadMode >>= gather hGetLine
+
+readAll :: Read a => String -> IO [a]
+readAll = fmap (map read) . loadStrings
 
 -- break the lines of the file into groups by blank lines
 loadStringGroups :: String -> IO [[String]]
