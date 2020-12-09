@@ -22,15 +22,20 @@ validate candidates currents (n:rest) =
                  currents' = tail currents ++ [n]
              in validate candidates' currents' rest
 
-findRegion :: [Int] -> Int -> Int
-findRegion input target =
-    let sublists = concatMap (\lst -> filter (\sublst -> length sublst >= 2) $ tails lst) $ filter (\lst -> length lst >= 2) $ inits input
-    in case find (\lst -> sum lst == target) sublists of
-        Nothing -> error "not found"
-        Just sublst ->
-            let sorted = sort sublst
-            in (head sorted) + (last sorted)
-
+findRegion :: [Int] -> Int -> [Int]
+findRegion as n = find' 0 [] as
+    where find' k ys xs
+            | k  == n  = ys
+            | xs == [] = error "no solution"
+            | k  <  n  =
+                let (x:xs') = xs
+                    k' = k + x
+                    ys' = ys ++ [x]
+                in find' k' ys' xs'
+            | k  >  n  =
+                let (y:ys') = ys
+                    k' = k - y
+                in find' k' ys' xs
 main :: IO ()
 main = do
     input <- readAll "days/Inputs/Day9.txt"
@@ -39,4 +44,7 @@ main = do
     let candidates = asCandidates preamble
     let sol1 = validate candidates preamble input'
     putStrLn $ show $ sol1
-    putStrLn $ show $ findRegion input sol1
+    let region = findRegion input sol1
+    let sorted = sort $ region
+    let sol2 = (head sorted) + (last sorted)
+    putStrLn $ show $ sol2
