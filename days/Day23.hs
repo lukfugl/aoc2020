@@ -1,63 +1,62 @@
 module Main where
 
-import qualified Data.Set as Set
-import Control.Monad.State.Lazy
+import Data.List (find)
+import Data.Map.Strict as Map (Map, fromList, (!), insert)
+import Data.Maybe (fromJust)
 
-example :: [Int]
-example = [3, 8, 9, 1, 2, 5, 4, 6, 7]
+data Circle = Circle Int Int (Map Int Int)
 
-input :: [Int]
-input = [3, 6, 4, 2, 8, 9, 7, 1, 5]
+asCircle :: [Int] -> Circle
+asCircle ns =
+    let offset = take (length ns) $ drop 1 $ cycle ns
+    in Circle (head ns) (length ns) (fromList $ zip ns offset)
 
-findCycleM :: Int -> State ([Int], Set.Set [Int]) Int
-findCycleM n = do
-    (cups, seen) <- get
-    if Set.member cups seen
-        then return n
-        else do
-            let cups' = move cups
-            let seen' = Set.insert cups seen
-            put (cups', seen')
-            findCycleM (n + 1)
+example :: Circle
+example = asCircle [3, 8, 9, 1, 2, 5, 4, 6, 7]
 
-findCycle :: [Int] -> Int
-findCycle cups = evalState (findCycleM 0) (cups, Set.empty)
+input :: Circle
+input = asCircle [3, 6, 4, 2, 8, 9, 7, 1, 5]
 
-move :: [Int] -> [Int]
-move (cup:cups) =
-    let pickedUp = take 3 cups
-        remaining = drop 3 cups
-        below = filter (< cup) remaining
-        candidates = if below == [] then remaining else below
-        destination = maximum candidates
-        beforeDestination = takeWhile (/= destination) remaining
-        (_:afterDestination) = dropWhile (/= destination) remaining
-    in beforeDestination ++ (destination:pickedUp) ++ afterDestination ++ [cup]
+unwindN :: Map Int Int -> Int -> Int -> [Int]
+unwindN _ _ 0 = []
+unwindN links k n = (k:unwindN links (links ! k) (n-1))
 
-moveN :: Int -> [Int] -> [Int]
+unwind :: Int -> Circle -> [Int]
+unwind k (Circle _ n links) = unwindN links k n
+
+unwind' :: Circle -> [Int]
+unwind' circle@(Circle k _ _) = unwind k circle
+
+instance Show Circle where
+    show circle =
+        let list = unwind' circle
+        in show' list
+        where show' [a] = show a
+              show' (a:as) = show a ++ " " ++ show' as
+
+extend :: Int -> Circle -> Circle
+extend n circle =
+    let list = unwind' circle
+        list' = list ++ drop (length list) [1..n]
+    in asCircle list'
+
+move :: Circle -> Circle
+move (Circle current n links) =
+    let next4 = drop 1 $ unwindN links current 5
+        pickedUp = take 3 next4
+        next = last next4
+        destination = fromJust $ find (`notElem` pickedUp) $ map (\d -> ((current - d - 1) `mod` n) + 1) [1..5]
+        links' = insert destination (head pickedUp) $ insert (last pickedUp) (links ! destination) $ insert current next links
+    in Circle next n links'
+
+moveN :: Int -> Circle -> Circle
 moveN 0 cups = cups
 moveN n cups = moveN (n - 1) $ move cups
 
-part1 :: Int -> [Int] -> [Int]
-part1 n cups =
-    let final = moveN n cups
-        before1 = takeWhile (/= 1) final
-        after1 = tail $ dropWhile (/= 1) final
-    in after1 ++ before1
-
-extend :: Int -> [Int] -> [Int]
-extend n cups = cups ++ drop (length cups) [1..n]
-
-part2 :: Int -> [Int] -> (Int, Int)
-part2 n m cups =
-    let cups' = extend n cups
-        k = findCycle cups'
-        m' = m `mod` k
-        (a:b:_) = part1 n' cups'
-    in (a, b)
+part1 :: Int -> Circle -> [Int]
+part1 n cups = drop 1 $ unwind 1 $ moveN n cups
 
 main :: IO ()
 main = do
-    --putStrLn $ show $ part1 100 input
-    let answer = findCycle $ extend 1000000 example
-    putStrLn $ show answer
+    putStrLn $ show $ part1 100 input
+    putStrLn $ show $ take 2 $ part1 10000000 $ extend 1000000 input
