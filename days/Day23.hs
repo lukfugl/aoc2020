@@ -1,62 +1,76 @@
 module Main where
 
+import Prelude hiding (lookup)
 import Data.List (find)
-import Data.Map.Strict as Map (Map, fromList, (!), insert)
+import Data.HashTable.IO (BasicHashTable, fromList, lookup, insert)
 import Data.Maybe (fromJust)
 
-data Circle = Circle Int Int (Map Int Int)
+type Links = BasicHashTable Int Int
+data Circle = Circle Int Int Links
 
-asCircle :: [Int] -> Circle
-asCircle ns =
-    let offset = take (length ns) $ drop 1 $ cycle ns
-    in Circle (head ns) (length ns) (fromList $ zip ns offset)
+asCircle :: [Int] -> IO Circle
+asCircle ns = do
+    let offset = take (length ns) $ tail $ cycle ns
+    links <- fromList $ zip ns offset
+    return $ Circle (head ns) (length ns) links
 
-example :: Circle
-example = asCircle [3, 8, 9, 1, 2, 5, 4, 6, 7]
+lookupLink :: Links -> Int -> IO Int
+lookupLink links = fmap fromJust . lookup links
 
-input :: Circle
-input = asCircle [3, 6, 4, 2, 8, 9, 7, 1, 5]
+example :: [Int]
+example = [3, 8, 9, 1, 2, 5, 4, 6, 7]
 
-unwindN :: Map Int Int -> Int -> Int -> [Int]
-unwindN _ _ 0 = []
-unwindN links k n = (k:unwindN links (links ! k) (n-1))
+input :: [Int]
+input = [3, 6, 4, 2, 8, 9, 7, 1, 5]
 
-unwind :: Int -> Circle -> [Int]
+unwindN :: Links -> Int -> Int -> IO [Int]
+unwindN _ _ 0 = return []
+unwindN links k n = do
+    k' <- lookupLink links k
+    fmap (k:) $ unwindN links k' (n-1)
+
+unwind :: Int -> Circle -> IO [Int]
 unwind k (Circle _ n links) = unwindN links k n
 
-unwind' :: Circle -> [Int]
+unwind' :: Circle -> IO [Int]
 unwind' circle@(Circle k _ _) = unwind k circle
 
-instance Show Circle where
-    show circle =
-        let list = unwind' circle
-        in show' list
-        where show' [a] = show a
-              show' (a:as) = show a ++ " " ++ show' as
-
-extend :: Int -> Circle -> Circle
-extend n circle =
-    let list = unwind' circle
-        list' = list ++ drop (length list) [1..n]
-    in asCircle list'
-
-move :: Circle -> Circle
-move (Circle current n links) =
-    let next4 = drop 1 $ unwindN links current 5
-        pickedUp = take 3 next4
+move :: Circle -> IO Circle
+move (Circle current n links) = do
+    next4 <- fmap (drop 1) $ unwindN links current 5
+    let pickedUp = take 3 next4
         next = last next4
         destination = fromJust $ find (`notElem` pickedUp) $ map (\d -> ((current - d - 1) `mod` n) + 1) [1..5]
-        links' = insert destination (head pickedUp) $ insert (last pickedUp) (links ! destination) $ insert current next links
-    in Circle next n links'
+    afterDestination <- lookupLink links destination
+    insert links destination (head pickedUp)
+    insert links (last pickedUp) afterDestination
+    insert links current next
+    return $ Circle next n links
 
-moveN :: Int -> Circle -> Circle
-moveN 0 cups = cups
-moveN n cups = moveN (n - 1) $ move cups
+moveN :: Int -> Circle -> IO Circle
+moveN 0 cups = return cups
+moveN n cups = do
+    cups' <- move cups
+    moveN (n - 1) cups'
 
-part1 :: Int -> Circle -> [Int]
-part1 n cups = drop 1 $ unwind 1 $ moveN n cups
+part1 :: Int -> [Int] -> IO [Int]
+part1 n cups = do
+    initial <- asCircle cups
+    final <- moveN n initial
+    list <- unwind 1 final
+    return $ tail list
+
+part2 :: Int -> Int -> [Int] -> IO Int
+part2 n m cups = do
+    let cups' = cups ++ drop (length cups) [1..n]
+    answer <- fmap (take 2) $ part1 m cups'
+    let a = head answer
+    let b = head $ tail answer
+    return $ a * b
 
 main :: IO ()
 main = do
-    putStrLn $ show $ part1 100 input
-    putStrLn $ show $ take 2 $ part1 10000000 $ extend 1000000 input
+    part1' <- part1 100 input
+    putStrLn $ show part1'
+    part2' <- part2 1000000 10000000 input
+    putStrLn $ show part2'
