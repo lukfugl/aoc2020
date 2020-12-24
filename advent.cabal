@@ -16,8 +16,8 @@ library
   default-language:    Haskell2010
 
 executable advent
-  main-is:             Day23.hs
+  main-is:             Day24.hs
   other-modules:       Inputs.Helpers
-  build-depends:       base ^>=4.13.0.0, advent, containers, mtl, hashtables
+  build-depends:       base ^>=4.13.0.0, advent, containers, mtl
   hs-source-dirs:      days
   default-language:    Haskell2010
